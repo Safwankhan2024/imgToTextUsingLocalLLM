@@ -1,74 +1,80 @@
 # Local Django VL Text Extractor
 
-A privacy-first, local-only Django application designed to extract text from images using local Vision-Language (VL) models like `llama.cpp`, `vLLM`, or `LM Studio`.
+Privacy-first Django app for extracting text from page images with a local vision-language model through an OpenAI-compatible endpoint.
 
-It allows users to upload screenshots (e.g., pages of a book), visually sequence them via a drag-and-drop web interface, and process them asynchronously in the background. It features robust safety mechanisms, including SQLite WAL mode to prevent database locks, and immediate localized text file backups to prevent data loss.
+You can organize content by book/chapter, upload multiple images, reorder them with drag-and-drop, run background extraction with Huey, and review stitched output in the app.
 
-## Features
-- **100% Local Processing:** No telemetry, no external API calls, completely disconnected capabilities.
-- **Real-Time Progress Tracking:** Live polling via HTMX shows page extraction status (Pending, Processing, Completed, Error) and progress counter—all without page refresh.
-- **Visual Sequencer:** Drag and drop uploaded images to ensure the text extraction perfectly matches the original sequence.
-- **Hash-Aware Ordering:** Each uploaded image is fingerprinted with a SHA-256 hash and reorder operations persist hash+position so stitched output always follows your exact arrangement.
-- **Hierarchical Structuring:** Categorize uploads by Book and Chapter.
-- **Asynchronous Execution:** Uses `Django-Huey` for background processing so the UI remains completely responsive during heavy LLM inference.
-- **Failsafe Text Backups:** Automatically appends extracted text to a raw `_fallback.txt` physical file immediately upon completion, bypassing the database as an extra safety measure.
+## What It Currently Does
+- Local-first workflow with configurable local API endpoint (`VL_API_BASE`).
+- Book and chapter management from the dashboard.
+- Multi-image upload per chapter.
+- Drag-and-drop page ordering persisted to the database.
+- SHA-256 hash stored for each uploaded image.
+- Background extraction using `django-huey` + SQLite Huey queue.
+- Per-page extraction status (`PENDING`, `PROCESSING`, `COMPLETED`, `ERROR`).
+- Fallback text backups written to `<Book>_<Chapter>_fallback.txt` in the project root.
 
 ## Requirements
 - Python 3.10+
-- A local Vision-Language model (e.g., LLaVA running via `llama.cpp`) that provides an OpenAI-compatible API endpoint.
+- A local VL model server that exposes an OpenAI-compatible `chat/completions` endpoint.
 
-## Installation
+## Setup
 
-1. **Clone the repository and set up a Virtual Environment**
+1. Create and activate a virtual environment.
    ```bash
    python -m venv venv
-   # Windows:
+   # Windows PowerShell
    .\venv\Scripts\Activate.ps1
-   # Linux/Mac:
-   source venv/bin/activate
    ```
 
-2. **Install exact dependencies**
+2. Install dependencies.
    ```bash
-   pip install -r requirements.txt
+   pip install django django-huey python-dotenv requests pillow
    ```
 
-3. **Set up Environment Variables**
-   Copy the example environment file and adjust it to point to your local LLM node:
+3. Copy environment configuration.
    ```bash
-   cp .env.example .env
+   copy .env.example .env
    ```
-   Edit `.env` to match your local setup configuration. Important settings include `VL_API_BASE`, `VL_MODEL`, and `LLM_TIMEOUT`.
 
-4. **Apply Database Migrations**
+4. Update `.env` values for your local model endpoint.
+   - `VL_API_BASE`
+   - `VL_MODEL`
+   - `LLM_TIMEOUT`
+   - `LLM_RETRIES`
+   - `LLM_MAX_TOKENS`
+   - `LLM_ENABLE_THINKING`
+
+5. Run migrations.
    ```bash
    python manage.py migrate
    ```
 
-## Running the Application
+## Run
 
-To run this application seamlessly, you must run both the Django web server and the Huey background worker at the same time.
+Start both processes:
 
-**Terminal 1 — The Web Server:**
-```bash
-.\venv\Scripts\Activate.ps1
-python manage.py runserver 0.0.0.0:8000
-```
+1. Django web server
+   ```bash
+   python manage.py runserver 0.0.0.0:8000
+   ```
 
-**Terminal 2 — The Background Worker:**
-```bash
-.\venv\Scripts\Activate.ps1
-python manage.py run_huey
-```
+2. Huey worker
+   ```bash
+   python manage.py run_huey
+   ```
+
+Open `http://127.0.0.1:8000`.
 
 ## Usage
-1. Navigate to `http://127.0.0.1:8000` in your browser.
-2. Create a **Book** (e.g., `"Manual"`).
-3. Create a **Chapter** assigned to that Book (e.g., `"Preface"`).
-4. Click into the Chapter and upload your screenshots.
-5. Drag and drop the thumbnails to ensure they are in the exact structural order.
-6. The app remembers each image hash and its new position whenever you reorder.
-7. Click **`Start VL Extraction`**. 
-8. The page status badges and progress counter update in real-time (every 2 seconds) as pages complete.
-9. Extraction automatically stops polling when all pages reach `COMPLETED` or `ERROR` state.
-10. Check your project folder; you will see physical `_fallback.txt` files generating in real time! You can also click **Review Text** on the chapter page to view the stitched result.
+1. Create a book.
+2. Create a chapter under that book.
+3. Open the chapter and upload page images.
+4. Reorder pages by dragging cards.
+5. Click `Start VL Extraction`.
+6. Open `Review Text` to view stitched extracted content.
+7. Check project root for generated `_fallback.txt` files.
+
+## Notes
+- This repository currently does not include a `requirements.txt`; dependencies are installed manually as shown above.
+- Static files are already present under `staticfiles/` in this repo snapshot.
