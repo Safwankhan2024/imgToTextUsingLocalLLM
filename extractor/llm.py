@@ -33,6 +33,8 @@ def extract_text_from_image(base64_image_uri: str) -> str:
     model_name = os.getenv("VL_MODEL", "llava")
     timeout_val = int(os.getenv("LLM_TIMEOUT", 120))
     retry_count = max(int(os.getenv("LLM_RETRIES", 1)), 0)
+    max_tokens = int(os.getenv("LLM_MAX_TOKENS", 8192))
+    enable_thinking = os.getenv("LLM_ENABLE_THINKING", "false").lower() == "true"
     
     headers = {
         "Content-Type": "application/json",
@@ -59,8 +61,9 @@ def extract_text_from_image(base64_image_uri: str) -> str:
                 ]
             }
         ],
-        "max_tokens": 2048,
-        "temperature": 0.1
+        "max_tokens": max_tokens,
+        "temperature": 0.1,
+        "chat_template_kwargs": {"enable_thinking": enable_thinking}
     }
 
     last_error = None
