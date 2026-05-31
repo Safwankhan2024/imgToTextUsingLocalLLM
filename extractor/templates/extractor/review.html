@@ -1,0 +1,18 @@
+{% extends 'extractor/base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'chapter_detail' chapter.id %}" class="btn btn-outline-secondary">&larr; Back to Extraction</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <h5>Review Stitched Output: {{ chapter.book.title }} - {{ chapter.title }}</h5>
+    </div>
+    <div class="card-body">
+        <textarea class="form-control" rows="20" style="font-family: monospace;">{% for page in pages %}{% if page.extracted_text %}{{ page.extracted_text }}
+
+{% endif %}{% endfor %}</textarea>
+    </div>
+</div>
+{% endblock %}

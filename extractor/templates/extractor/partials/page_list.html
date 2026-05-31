@@ -1,0 +1,31 @@
+<div id="page-list" class="row sortable g-3">
+    {% for page in pages %}
+    <div class="col-md-3 page-item">
+        <input type="hidden" name="page" value="{{ page.id }}" />
+        <div class="card h-100 shadow-sm border-0">
+            <div class="position-absolute top-0 start-0 m-2">
+                <span class="badge bg-dark rounded-pill">{{ page.sequence }}</span>
+            </div>
+            <div class="position-absolute top-0 end-0 m-2">
+                {% if page.status == 'PENDING' %}
+                <span class="badge bg-secondary">Pending</span>
+                {% elif page.status == 'PROCESSING' %}
+                <span class="badge bg-warning text-dark">Processing</span>
+                {% elif page.status == 'COMPLETED' %}
+                <span class="badge bg-success">Done</span>
+                {% else %}
+                <span class="badge bg-danger">Error</span>
+                {% endif %}
+            </div>
+            <img src="{{ page.image.url }}" class="card-img-top p-2" style="height: 200px; object-fit: contain; background: #fff;" alt="Page {{ page.sequence }}">
+            <div class="card-footer bg-white border-top-0 pt-0">
+                <small class="text-muted d-block text-truncate">ID: {{ page.id }}</small>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">No images uploaded yet. Upload images and sequence them here.</div>
+    </div>
+    {% endfor %}
+</div>

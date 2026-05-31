@@ -1,0 +1,71 @@
+{% extends 'extractor/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ chapter.book.title }} - <span class="text-muted">{{ chapter.title }}</span></h2>
+    <div>
+        <a href="{% url 'review_extracted' chapter.id %}" class="btn btn-outline-info">Review Text</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form id="uploadForm" hx-encoding="multipart/form-data" hx-post="{% url 'upload_images' chapter.id %}" hx-target="#page-list" hx-swap="outerHTML">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="images" class="form-label fw-bold">Upload Snapshot Images (in order or batch)</label>
+                        <input class="form-control" type="file" id="images" name="images" multiple accept="image/*"required>
+                    </div>
+                    <button class="btn btn-primary">
+                        Upload & Add
+                    </button>
+                    <img id="spinner" class="htmx-indicator ms-2" src="https://cdnjs.cloudflare.com/ajax/libs/galleriffic/2.0.1/css/loader.gif" width="20" />
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Page Sequence</h5>
+        <div id="extract-container">
+            <button hx-post="{% url 'trigger_extraction' chapter.id %}" hx-target="#extract-container" hx-swap="innerHTML" class="btn btn-success">
+                Start VL Extraction
+            </button>
+        </div>
+    </div>
+    <div class="card-body bg-light">
+        <form id="sortable-form" hx-post="{% url 'reorder_pages' chapter.id %}" hx-trigger="end" hx-target="#page-list" hx-swap="outerHTML">
+            {% csrf_token %}
+            {% include 'extractor/partials/page_list.html' %}
+        </form>
+    </div>
+</div>
+
+<script>
+    htmx.onLoad(function(content) {
+        var sortables = content.querySelectorAll(".sortable");
+        for (var i = 0; i < sortables.length; i++) {
+            var sortable = sortables[i];
+            new Sortable(sortable, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+            });
+            
+            sortable.addEventListener("end", function () {
+                document.getElementById('sortable-form').dispatchEvent(new Event('end'));
+            });
+        }
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        // Clear upload input after successful upload
+        if(evt.detail.target.id === 'page-list' && evt.detail.elt.id === 'uploadForm') {
+            document.getElementById('images').value = '';
+        }
+    });
+</script>
+{% endblock %}

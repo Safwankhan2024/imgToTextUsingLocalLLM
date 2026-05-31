@@ -1,0 +1,73 @@
+{% extends 'extractor/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">Create Book</div>
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_book">
+                    <div class="mb-3">
+                        <label>Title</label>
+                        <input type="text" name="title" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Subtitle (Optional)</label>
+                        <input type="text" name="subtitle" class="form-control">
+                    </div>
+                    <button class="btn btn-primary w-100">Create</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">Create Chapter</div>
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_chapter">
+                    <div class="mb-3">
+                        <label>Select Book</label>
+                        <select name="book_id" class="form-select" required>
+                            {% for book in books %}
+                            <option value="{{ book.id }}">{{ book.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Chapter / Part Title</label>
+                        <input type="text" name="title" class="form-control" required>
+                    </div>
+                    <button class="btn btn-secondary w-100">Create</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <h3 class="mb-3">Library</h3>
+        {% for book in books %}
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">{{ book.title }} <small class="text-muted">{{ book.subtitle }}</small></h5>
+                <hr>
+                <div class="list-group">
+                    {% for chapter in book.chapters.all %}
+                    <a href="{% url 'chapter_detail' chapter.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        {{ chapter.title }}
+                        <span class="badge bg-primary rounded-pill">{{ chapter.pages.count }} Pages</span>
+                    </a>
+                    {% empty %}
+                    <span class="text-muted small">No chapters yet.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">No books in the library. Create one to get started.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

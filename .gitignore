@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+
+# Environment Variables
+.env
+
+# Django & Logs
+*.log
+local_settings.py
+
+# SQLite Databases & WAL files
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-wal
+db.sqlite3-shm
+db_huey.sqlite3
+db_huey.sqlite3-journal
+db_huey.sqlite3-wal
+db_huey.sqlite3-shm
+
+# User Uploads (Images)
+media/
+media/*
+
+# Extracted Text Outputs / Fallback Files
+*_fallback.txt
