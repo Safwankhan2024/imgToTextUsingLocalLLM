@@ -10,9 +10,7 @@
         <h5>Review Stitched Output: {{ chapter.book.title }} - {{ chapter.title }}</h5>
     </div>
     <div class="card-body">
-        <textarea class="form-control" rows="20" style="font-family: monospace;">{% for page in pages %}{% if page.extracted_text %}{{ page.extracted_text }}
-
-{% endif %}{% endfor %}</textarea>
+        <textarea class="form-control" rows="20" style="font-family: monospace;">{{ stitched_text }}</textarea>
     </div>
 </div>
 {% endblock %}

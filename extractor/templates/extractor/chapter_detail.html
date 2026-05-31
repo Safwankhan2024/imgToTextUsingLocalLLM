@@ -38,7 +38,8 @@
         </div>
     </div>
     <div class="card-body bg-light">
-        <form id="sortable-form" hx-post="{% url 'reorder_pages' chapter.id %}" hx-trigger="end" hx-target="#page-list" hx-swap="outerHTML">
+        <p class="text-muted small mb-2"><i>Drag and drop cards to reorder pages. Order is saved automatically.</i></p>
+        <form id="sortable-form" hx-post="{% url 'reorder_pages' chapter.id %}" hx-target="#page-list" hx-swap="outerHTML">
             {% csrf_token %}
             {% include 'extractor/partials/page_list.html' %}
         </form>
@@ -46,23 +47,38 @@
 </div>
 
 <script>
-    htmx.onLoad(function(content) {
-        var sortables = content.querySelectorAll(".sortable");
-        for (var i = 0; i < sortables.length; i++) {
-            var sortable = sortables[i];
-            new Sortable(sortable, {
-                animation: 150,
-                ghostClass: 'sortable-ghost',
-            });
-            
-            sortable.addEventListener("end", function () {
-                document.getElementById('sortable-form').dispatchEvent(new Event('end'));
-            });
+    function submitPageOrder() {
+        var sortableForm = document.getElementById('sortable-form');
+        if (sortableForm) {
+            htmx.trigger(sortableForm, 'submit');
+        }
+    }
+
+    function initSortable(root) {
+        var el = root.querySelector('#page-list');
+        if (!el || el.dataset.sortableInitialized === '1') return;
+        new Sortable(el, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            handle: '.page-item',
+            onEnd: function() {
+                submitPageOrder();
+            }
+        });
+        el.dataset.sortableInitialized = '1';
+    }
+
+    // Init on first load
+    document.addEventListener('DOMContentLoaded', function() { initSortable(document); });
+
+    // Re-init after HTMX swaps (upload or reorder response)
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'page-list') {
+            initSortable(document);
         }
     });
 
     document.body.addEventListener('htmx:afterRequest', function(evt) {
-        // Clear upload input after successful upload
         if(evt.detail.target.id === 'page-list' && evt.detail.elt.id === 'uploadForm') {
             document.getElementById('images').value = '';
         }

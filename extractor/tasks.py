@@ -39,7 +39,7 @@ def process_chapter_images(chapter_id):
                 
                 # Safely append to fallback file
                 with open(fallback_filepath, "a", encoding="utf-8") as f:
-                    f.write(f"\n\n--- Page {page.sequence} ---\n\n")
+                    f.write(f"\n\n--- Page {page.sequence} | Hash {page.image_hash} ---\n\n")
                     f.write(extracted_text)
                     
             except Exception as e:

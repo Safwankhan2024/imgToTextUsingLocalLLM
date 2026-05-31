@@ -23,7 +23,7 @@ def dashboard(request):
 
 def chapter_detail(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
-    pages = chapter.pages.all()
+    pages = chapter.pages.order_by('sequence', 'id')
     return render(request, 'extractor/chapter_detail.html', {'chapter': chapter, 'pages': pages})
 
 def upload_images(request, chapter_id):
@@ -40,18 +40,26 @@ def upload_images(request, chapter_id):
                 image=img,
                 sequence=start_seq + idx
             )
-    pages = chapter.pages.all()
+    pages = chapter.pages.order_by('sequence', 'id')
     return render(request, 'extractor/partials/page_list.html', {'pages': pages})
 
 def reorder_pages(request, chapter_id):
     if request.method == 'POST':
-        # HTMX SortableJS sends 'page' as an array in the new order
+        # Sortable sends arrays in visual order; we persist both ID and hash order.
         page_ids = request.POST.getlist('page')
+        page_hashes = request.POST.getlist('page_hash')
+
         for index, page_id in enumerate(page_ids, start=1):
-            PageImage.objects.filter(id=page_id, chapter_id=chapter_id).update(sequence=index)
+            query = PageImage.objects.filter(id=page_id, chapter_id=chapter_id)
+            if len(page_hashes) >= index and page_hashes[index - 1]:
+                updated = query.filter(image_hash=page_hashes[index - 1]).update(sequence=index)
+                if updated == 0:
+                    query.update(sequence=index)
+            else:
+                query.update(sequence=index)
         
         chapter = get_object_or_404(Chapter, id=chapter_id)
-        pages = chapter.pages.all()
+        pages = chapter.pages.order_by('sequence', 'id')
         return render(request, 'extractor/partials/page_list.html', {'pages': pages})
 
 def trigger_extraction(request, chapter_id):
@@ -67,5 +75,10 @@ def trigger_extraction(request, chapter_id):
 
 def review_extracted(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
-    pages = chapter.pages.all()
-    return render(request, 'extractor/review.html', {'chapter': chapter, 'pages': pages})
+    pages = chapter.pages.order_by('sequence', 'id')
+    stitched_text = "\n\n".join(page.extracted_text for page in pages if page.extracted_text)
+    return render(
+        request,
+        'extractor/review.html',
+        {'chapter': chapter, 'pages': pages, 'stitched_text': stitched_text}
+    )
