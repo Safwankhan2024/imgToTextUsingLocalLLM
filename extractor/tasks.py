@@ -29,6 +29,8 @@ def process_chapter_images(chapter_id):
                 # Call local LLM (llama.cpp format typically handles base64 URIs)
                 data_uri = f"data:{mime_type};base64,{base64_image}"
                 extracted_text = extract_text_from_image(data_uri)
+                if not extracted_text.strip():
+                    raise ValueError("Vision model returned empty text.")
                 
                 # Save to database
                 page.extracted_text = extracted_text
