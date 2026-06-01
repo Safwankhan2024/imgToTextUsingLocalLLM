@@ -1,6 +1,50 @@
 {% extends 'extractor/base.html' %}
 
 {% block content %}
+<style>
+.img-zoom-frame {
+    position: relative;
+    overflow: hidden;
+    height: 600px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    cursor: grab;
+    user-select: none;
+}
+.img-zoom-frame.dragging {
+    cursor: grabbing;
+}
+.img-zoom-frame img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transform-origin: 0 0;
+    pointer-events: none;
+    will-change: transform;
+}
+.img-zoom-controls {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    z-index: 10;
+}
+.img-zoom-controls button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 4px;
+    opacity: 0.85;
+}
+.img-zoom-controls button:hover { opacity: 1; }
+</style>
+
 <div class="mb-4">
     <a href="{% url 'chapter_detail' chapter.id %}" class="btn btn-outline-secondary">&larr; Back to Extraction</a>
 </div>
@@ -17,7 +61,14 @@
     <div class="card-body">
         <div class="row g-3">
             <div class="col-md-5">
-                <img src="{{ page.image.url }}" alt="Page {{ page.sequence }}" class="img-fluid rounded border" style="max-height: 600px; object-fit: contain; width: 100%;">
+                <div class="img-zoom-frame" data-zoom-frame>
+                    <img src="{{ page.image.url }}" alt="Page {{ page.sequence }}">
+                    <div class="img-zoom-controls">
+                        <button class="btn btn-light btn-sm" data-zoom-in title="Zoom in">+</button>
+                        <button class="btn btn-light btn-sm" data-zoom-out title="Zoom out">&minus;</button>
+                        <button class="btn btn-light btn-sm" data-zoom-reset title="Reset">&#x21BA;</button>
+                    </div>
+                </div>
             </div>
             <div class="col-md-7">
                 <textarea class="form-control h-100" style="font-family: monospace; min-height: 300px; resize: vertical;">{{ page.extracted_text }}</textarea>
@@ -27,4 +78,129 @@
 </div>
 {% endif %}
 {% endfor %}
+
+<script>
+document.querySelectorAll('[data-zoom-frame]').forEach(function(frame) {
+    const img = frame.querySelector('img');
+    let scale = 1, originX = 0, originY = 0;
+    let dragging = false, startX = 0, startY = 0, lastOriginX = 0, lastOriginY = 0;
+    const STEP = 0.25, MIN = 0.5, MAX = 5;
+
+    function clampOrigin(s, ox, oy) {
+        const fw = frame.clientWidth, fh = frame.clientHeight;
+        const iw = img.naturalWidth || fw, ih = img.naturalHeight || fh;
+        // Fit-contain dimensions
+        const fitScale = Math.min(fw / iw, fh / ih);
+        const rendW = iw * fitScale * s, rendH = ih * fitScale * s;
+        const maxOx = 0, minOx = Math.min(0, fw - rendW);
+        const maxOy = 0, minOy = Math.min(0, fh - rendH);
+        return [
+            Math.max(minOx, Math.min(maxOx, ox)),
+            Math.max(minOy, Math.min(maxOy, oy))
+        ];
+    }
+
+    function applyTransform() {
+        img.style.transform = `translate(${originX}px, ${originY}px) scale(${scale})`;
+    }
+
+    function zoomAt(cx, cy, newScale) {
+        newScale = Math.max(MIN, Math.min(MAX, newScale));
+        // Keep point (cx, cy) in frame stable
+        originX = cx - (cx - originX) * (newScale / scale);
+        originY = cy - (cy - originY) * (newScale / scale);
+        scale = newScale;
+        [originX, originY] = clampOrigin(scale, originX, originY);
+        applyTransform();
+    }
+
+    function reset() {
+        scale = 1; originX = 0; originY = 0;
+        applyTransform();
+    }
+
+    // Mouse wheel zoom (zooms toward cursor position)
+    frame.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const rect = frame.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const delta = e.deltaY < 0 ? STEP : -STEP;
+        zoomAt(cx, cy, scale + delta);
+    }, { passive: false });
+
+    // Drag to pan
+    frame.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        dragging = true;
+        frame.classList.add('dragging');
+        startX = e.clientX; startY = e.clientY;
+        lastOriginX = originX; lastOriginY = originY;
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        originX = lastOriginX + (e.clientX - startX);
+        originY = lastOriginY + (e.clientY - startY);
+        [originX, originY] = clampOrigin(scale, originX, originY);
+        applyTransform();
+    });
+    window.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        frame.classList.remove('dragging');
+    });
+
+    // Touch pinch-zoom + drag
+    let lastTouchDist = null, lastTouchMidX = 0, lastTouchMidY = 0;
+    let touchStartOriginX = 0, touchStartOriginY = 0, touchStartScale = 1;
+    frame.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+            dragging = true;
+            startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+            lastOriginX = originX; lastOriginY = originY;
+        } else if (e.touches.length === 2) {
+            dragging = false;
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            lastTouchDist = Math.hypot(dx, dy);
+            lastTouchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            lastTouchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            touchStartScale = scale;
+            touchStartOriginX = originX; touchStartOriginY = originY;
+        }
+        e.preventDefault();
+    }, { passive: false });
+    frame.addEventListener('touchmove', function(e) {
+        const rect = frame.getBoundingClientRect();
+        if (e.touches.length === 1 && dragging) {
+            originX = lastOriginX + (e.touches[0].clientX - startX);
+            originY = lastOriginY + (e.touches[0].clientY - startY);
+            [originX, originY] = clampOrigin(scale, originX, originY);
+            applyTransform();
+        } else if (e.touches.length === 2 && lastTouchDist !== null) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+            const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+            const newScale = Math.max(MIN, Math.min(MAX, touchStartScale * dist / lastTouchDist));
+            zoomAt(midX, midY, newScale);
+        }
+        e.preventDefault();
+    }, { passive: false });
+    frame.addEventListener('touchend', function() {
+        dragging = false; lastTouchDist = null;
+    });
+
+    // Buttons
+    frame.querySelector('[data-zoom-in]').addEventListener('click', function() {
+        zoomAt(frame.clientWidth / 2, frame.clientHeight / 2, scale + STEP);
+    });
+    frame.querySelector('[data-zoom-out]').addEventListener('click', function() {
+        zoomAt(frame.clientWidth / 2, frame.clientHeight / 2, scale - STEP);
+    });
+    frame.querySelector('[data-zoom-reset]').addEventListener('click', reset);
+});
+</script>
 {% endblock %}
