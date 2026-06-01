@@ -4,12 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>Local VL Extractor</title>
     <!-- Apply theme before any paint to prevent flash -->
     <script>
         (function() {
-            var t = localStorage.getItem('tuv-theme-preference') || 'dark';
+            var savedTheme = localStorage.getItem('tuv-theme-preference');
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var t = savedTheme || (prefersDark ? 'dark' : 'light');
             document.documentElement.setAttribute('data-theme', t);
+            document.documentElement.style.colorScheme = t;
             if (t === 'dark') document.documentElement.classList.add('dark-theme-preload');
         })();
     </script>
@@ -40,7 +44,7 @@
         <a class="navbar-brand text-dark fw-bold" href="{% url 'dashboard' %}">📖 VL Extractor</a>
         <button id="theme-toggle-btn"
                 class="btn btn-sm btn-outline-secondary"
-                aria-pressed="true"
+                type="button"
                 title="Switch theme">
             ☀️ Light
         </button>

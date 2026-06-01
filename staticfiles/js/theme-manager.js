@@ -19,7 +19,7 @@ class ThemeManager {
         // Load saved preference or use default
         const savedTheme = this.getSavedTheme();
         const prefersDark = this.getSystemPreference();
-        const themeToApply = savedTheme || this.DEFAULT_THEME;
+        const themeToApply = savedTheme || prefersDark;
         
         // Apply theme immediately to prevent flash
         this.applyTheme(themeToApply);
@@ -39,6 +39,9 @@ class ThemeManager {
      * Get system color scheme preference
      */
     getSystemPreference() {
+        if (!window.matchMedia) {
+            return this.DEFAULT_THEME;
+        }
         return window.matchMedia('(prefers-color-scheme: dark)').matches
             ? this.DARK_THEME
             : this.LIGHT_THEME;
@@ -56,6 +59,7 @@ class ThemeManager {
         
         // Apply to html element for attribute selectors
         document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
         
         // Save preference
         localStorage.setItem(this.STORAGE_KEY, theme);
@@ -80,7 +84,7 @@ class ThemeManager {
         }
         
         // Set appropriate color for dark/light theme
-        metaThemeColor.content = isDark ? '#0d1117' : '#ffffff';
+        metaThemeColor.content = isDark ? '#0d1117' : '#f8fafc';
     }
 
     /**
@@ -126,6 +130,7 @@ class ThemeManager {
         const isDark = this.getCurrentTheme() === this.DARK_THEME;
         toggleBtn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
         toggleBtn.setAttribute('aria-pressed', isDark);
+        toggleBtn.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
         toggleBtn.setAttribute('title', isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme');
     }
 
@@ -133,6 +138,9 @@ class ThemeManager {
      * Respond to system theme changes
      */
     watchSystemPreference() {
+        if (!window.matchMedia) {
+            return;
+        }
         const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
         darkModeQuery.addEventListener('change', (e) => {
             // Only change if user hasn't explicitly set a preference

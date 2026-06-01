@@ -18,7 +18,7 @@
                 <span class="badge bg-danger">Error</span>
                 {% endif %}
             </div>
-            <img src="{{ page.image.url }}" class="card-img-top p-2" style="height: 200px; object-fit: contain; background: #fff;" alt="Page {{ page.sequence }}">
+            <img src="{{ page.image.url }}" class="card-img-top p-2 page-preview-image" style="height: 200px; object-fit: contain;" loading="lazy" alt="Page {{ page.sequence }}">
             <div class="card-footer bg-white border-top-0 pt-0">
                 <small class="text-muted d-block text-truncate">ID: {{ page.id }}</small>
                 <small class="text-muted d-block text-truncate">Hash: {{ page.image_hash|default:'pending'|slice:':16' }}</small>
