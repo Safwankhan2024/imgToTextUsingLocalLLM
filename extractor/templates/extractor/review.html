@@ -5,12 +5,26 @@
     <a href="{% url 'chapter_detail' chapter.id %}" class="btn btn-outline-secondary">&larr; Back to Extraction</a>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-white">
-        <h5>Review Stitched Output: {{ chapter.book.title }} - {{ chapter.title }}</h5>
+<h5 class="mb-3">Review: {{ chapter.book.title }} &mdash; {{ chapter.title }}</h5>
+
+{% for page in pages %}
+{% if page.extracted_text %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white d-flex align-items-center">
+        <span class="fw-semibold">Page {{ page.sequence }}</span>
+        <span class="ms-2 badge {% if page.status == 'COMPLETED' %}bg-success{% elif page.status == 'ERROR' %}bg-danger{% else %}bg-secondary{% endif %}">{{ page.status }}</span>
     </div>
     <div class="card-body">
-        <textarea class="form-control" rows="20" style="font-family: monospace;">{{ stitched_text }}</textarea>
+        <div class="row g-3">
+            <div class="col-md-5">
+                <img src="{{ page.image.url }}" alt="Page {{ page.sequence }}" class="img-fluid rounded border" style="max-height: 600px; object-fit: contain; width: 100%;">
+            </div>
+            <div class="col-md-7">
+                <textarea class="form-control h-100" style="font-family: monospace; min-height: 300px; resize: vertical;">{{ page.extracted_text }}</textarea>
+            </div>
+        </div>
     </div>
 </div>
+{% endif %}
+{% endfor %}
 {% endblock %}
