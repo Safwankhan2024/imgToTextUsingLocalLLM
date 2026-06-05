@@ -26,6 +26,8 @@ db_huey.sqlite3-shm
 # User Uploads (Images)
 media/
 media/*
+review/
+review/*
 
 # Extracted Text Outputs / Fallback Files
 *_fallback.txt
