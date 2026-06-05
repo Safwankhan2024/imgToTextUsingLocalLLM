@@ -1,4 +1,9 @@
-<div id="page-list" class="row g-3">
+<div id="page-list" class="row g-3"
+    {% if has_processing %}
+    hx-get="{% url 'page_list_status' chapter.id %}"
+    hx-trigger="every 2s"
+    hx-swap="outerHTML"
+    {% endif %}>
     {% for page in pages %}
     <div class="col-md-3 page-item" data-page-id="{{ page.id }}">
         <input type="hidden" name="page" value="{{ page.id }}" />

@@ -83,5 +83,10 @@
             document.getElementById('images').value = '';
         }
     });
+
+    // Refresh page list when extraction starts (HX-Trigger from trigger_extraction)
+    document.body.addEventListener('refreshPageList', function() {
+        htmx.ajax('GET', '{% url "page_list_status" chapter.id %}', {target: '#page-list', swap: 'outerHTML'});
+    });
 </script>
 {% endblock %}

@@ -24,7 +24,10 @@ def dashboard(request):
 def chapter_detail(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
     pages = chapter.pages.order_by('sequence', 'id')
-    return render(request, 'extractor/chapter_detail.html', {'chapter': chapter, 'pages': pages})
+    has_processing = pages.filter(status='PROCESSING').exists()
+    return render(request, 'extractor/chapter_detail.html', {
+        'chapter': chapter, 'pages': pages, 'has_processing': has_processing
+    })
 
 def upload_images(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
@@ -41,7 +44,10 @@ def upload_images(request, chapter_id):
                 sequence=start_seq + idx
             )
     pages = chapter.pages.order_by('sequence', 'id')
-    return render(request, 'extractor/partials/page_list.html', {'pages': pages})
+    has_processing = pages.filter(status='PROCESSING').exists()
+    return render(request, 'extractor/partials/page_list.html', {
+        'pages': pages, 'chapter': chapter, 'has_processing': has_processing
+    })
 
 def reorder_pages(request, chapter_id):
     if request.method == 'POST':
@@ -60,7 +66,10 @@ def reorder_pages(request, chapter_id):
         
         chapter = get_object_or_404(Chapter, id=chapter_id)
         pages = chapter.pages.order_by('sequence', 'id')
-        return render(request, 'extractor/partials/page_list.html', {'pages': pages})
+        has_processing = pages.filter(status='PROCESSING').exists()
+        return render(request, 'extractor/partials/page_list.html', {
+            'pages': pages, 'chapter': chapter, 'has_processing': has_processing
+        })
 
 def trigger_extraction(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
@@ -71,7 +80,17 @@ def trigger_extraction(request, chapter_id):
     from .tasks import process_chapter_images
     process_chapter_images(chapter.id)
     
-    return HttpResponse("<button class='btn btn-success' disabled>Extraction Started...</button>")
+    response = HttpResponse("<button class='btn btn-success' disabled>Extraction Started...</button>")
+    response['HX-Trigger'] = 'refreshPageList'
+    return response
+
+def page_list_status(request, chapter_id):
+    chapter = get_object_or_404(Chapter, id=chapter_id)
+    pages = chapter.pages.order_by('sequence', 'id')
+    has_processing = pages.filter(status='PROCESSING').exists()
+    return render(request, 'extractor/partials/page_list.html', {
+        'pages': pages, 'chapter': chapter, 'has_processing': has_processing
+    })
 
 def review_extracted(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
