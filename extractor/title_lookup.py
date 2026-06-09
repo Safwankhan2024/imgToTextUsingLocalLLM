@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
@@ -40,7 +41,9 @@ def lookup_year_for_title(title):
         queries = [title]
 
     search_results = []
-    for query in queries:
+    for i, query in enumerate(queries):
+        if i > 0:
+            time.sleep(2)  # be polite to DuckDuckGo
         try:
             results = _run_duckduckgo_search(query, max_results=5)
         except Exception as exc:
@@ -144,6 +147,8 @@ def run_batch_lookup(task_id):
             
             # Skip if already processed
             if title not in processed_titles:
+                if processed_titles:
+                    time.sleep(3)  # be polite to DuckDuckGo between titles
                 result = lookup_year_for_title(title)
                 summary['titles'].append(result)
                 processed_titles.add(title)

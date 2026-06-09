@@ -145,15 +145,60 @@ def _strip_thinking_blocks(text: str) -> str:
     return result.strip()
 
 
-def _extract_json_from_markdown(text: str):
-    """Try to extract JSON from a markdown ```json ... ``` code fence."""
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
+def _find_balanced_json(text: str, start_at: int = 0) -> str | None:
+    """Find the first balanced { ... } JSON object in *text*, respecting
+    JSON string boundaries (so braces inside "reasoning": "foo {bar} baz"
+    don't break the brace counter).  Returns the substring (inclusive of
+    both braces) or None."""
+    # find the first opening brace
+    i = text.find("{", start_at)
+    if i == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    n = len(text)
+
+    for j in range(i, n):
+        ch = text[j]
+        if escape:
+            escape = False
+            continue
+        if in_string:
+            if ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        # not in a string
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[i:j + 1]
     return None
+
+
+def _extract_json_from_markdown(text: str):
+    """Try to extract JSON from a markdown ```json ... ``` code fence.
+
+    Uses string-aware brace matching so braces inside JSON string values
+    don't cause premature truncation."""
+    fence = re.search(r"```(?:json)?\s*\n?", text)
+    if not fence:
+        return None
+    body_start = fence.end()
+    candidate = _find_balanced_json(text, start_at=body_start)
+    if candidate is None:
+        return None
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
 
 
 def _parse_json_output(raw_text):
@@ -168,39 +213,56 @@ def _parse_json_output(raw_text):
     if result is not None:
         return result
 
-    # 3. Try last JSON object (from last { to last }) — the actual answer is
-    #    usually the LAST JSON blob, while thinking blocks may contain earlier ones.
-    last_brace = cleaned.rfind("}")
-    if last_brace != -1:
-        # Find the matching opening brace by walking backwards
+    # 3. Try last JSON object — walk backwards finding } then match {
+    #    to { using string-aware balancing (the actual answer is usually
+    #    the LAST JSON blob, while thinking blocks may contain earlier ones).
+    for i in range(len(cleaned) - 1, -1, -1):
+        ch = cleaned[i]
+        if ch != "}":
+            continue
+        # Walk backwards from each } to find its matching {, respecting strings
         depth = 0
-        start = -1
-        for i in range(last_brace, -1, -1):
-            ch = cleaned[i]
-            if ch == "}":
+        in_string = False
+        escape = False
+        for j in range(i, -1, -1):
+            c = cleaned[j]
+            # When walking backwards, an unescaped " toggles string state
+            if escape:
+                escape = False
+                continue
+            if c == '"':
+                # Check if this quote is escaped: look backward for odd backslashes
+                bs = 0
+                k = j - 1
+                while k >= 0 and cleaned[k] == "\\":
+                    bs += 1
+                    k -= 1
+                if bs % 2 == 0:  # even backslashes → not escaped
+                    in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if c == "}":
                 depth += 1
-            elif ch == "{":
+            elif c == "{":
                 depth -= 1
             if depth == 0:
-                start = i
-                break
-        if start != -1:
-            json_text = cleaned[start:last_brace + 1]
-            try:
-                return json.loads(json_text)
-            except json.JSONDecodeError:
-                pass
+                start = j
+                json_text = cleaned[start:i + 1]
+                try:
+                    return json.loads(json_text)
+                except json.JSONDecodeError:
+                    break  # try the next }
+        break  # only try the very last }, then fall through
 
-    # 4. Fallback: first { to last } (original behavior, less robust)
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    json_text = cleaned[start:end + 1]
-    try:
-        return json.loads(json_text)
-    except json.JSONDecodeError:
-        return None
+    # 4. Fallback: first { to its matching } using string-aware matching
+    candidate = _find_balanced_json(cleaned)
+    if candidate:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+    return None
 
 
 def generate_search_queries(title):
@@ -215,7 +277,7 @@ def generate_search_queries(title):
     ]
     response = chat_completion(messages)
     lines = [
-        line.strip().lstrip('-*0123456789. ').strip()
+        re.sub(r'^[\d.\-*\s]+', '', line.strip())
         for line in response.splitlines()
         if line.strip()
     ]
