@@ -1,5 +1,5 @@
 <div id="title-lookup-status" class="card shadow-sm border-0"
-    {% if task.status == 'PROCESSING' %}
+    {% if task.status in 'PROCESSING,PENDING' %}
     hx-get="{% url 'title_lookup_status' task.task_id %}"
     hx-trigger="every 2s"
     hx-swap="outerHTML"
