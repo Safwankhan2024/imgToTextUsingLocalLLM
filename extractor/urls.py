@@ -9,4 +9,6 @@ urlpatterns = [
     path('chapter/<int:chapter_id>/extract/', views.trigger_extraction, name='trigger_extraction'),
     path('chapter/<int:chapter_id>/page-list-status/', views.page_list_status, name='page_list_status'),
     path('chapter/<int:chapter_id>/review/', views.review_extracted, name='review_extracted'),
+    path('lookup-years/', views.title_year_lookup, name='title_year_lookup'),
+    path('lookup-years/<uuid:task_id>/status/', views.title_lookup_status, name='title_lookup_status'),
 ]

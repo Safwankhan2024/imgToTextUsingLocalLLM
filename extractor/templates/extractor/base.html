@@ -41,7 +41,10 @@
 
 <nav class="navbar navbar-dark bg-white shadow-sm mb-4">
     <div class="container d-flex align-items-center justify-content-between">
-        <a class="navbar-brand text-dark fw-bold" href="{% url 'dashboard' %}">📖 VL Extractor</a>
+        <div class="d-flex align-items-center gap-2">
+            <a class="navbar-brand text-dark fw-bold" href="{% url 'dashboard' %}">📖 VL Extractor</a>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'title_year_lookup' %}">Lookup Years</a>
+        </div>
         <button id="theme-toggle-btn"
                 class="btn btn-sm btn-outline-secondary"
                 type="button"

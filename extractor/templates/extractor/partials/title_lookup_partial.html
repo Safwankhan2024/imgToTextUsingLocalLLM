@@ -1,0 +1,70 @@
+<div id="title-lookup-status" class="card shadow-sm border-0"
+    {% if task.status == 'PROCESSING' %}
+    hx-get="{% url 'title_lookup_status' task.task_id %}"
+    hx-trigger="every 2s"
+    hx-swap="outerHTML"
+    {% endif %}>
+    <div class="card-body">
+        <h2 class="card-title">Lookup Status</h2>
+        <p class="mb-2">
+            <strong>Status:</strong>
+            {% if task.status == 'PENDING' %}
+                <span class="badge bg-secondary">Pending</span>
+            {% elif task.status == 'PROCESSING' %}
+                <span class="badge bg-warning text-dark">Processing</span>
+            {% elif task.status == 'COMPLETED' %}
+                <span class="badge bg-success">Completed</span>
+            {% else %}
+                <span class="badge bg-danger">Error</span>
+            {% endif %}
+        </p>
+
+        {% if task.error_message %}
+        <div class="alert alert-danger">
+            <strong>Error:</strong> {{ task.error_message }}
+        </div>
+        {% endif %}
+
+        <p class="text-muted small mb-3">
+            Task started at: {{ task.started_at|default:'Not started' }}<br>
+            Completed at: {{ task.completed_at|default:'N/A' }}
+        </p>
+
+        {% if task.summary_json and task.status == 'COMPLETED' %}
+            <div class="mb-3">
+                <strong>Found {{ task.summary_json.titles|length }} title(s)</strong>
+            </div>
+            {% for result in task.summary_json.titles %}
+            <div class="mb-4">
+                <h5>{{ result.title }}</h5>
+                <p class="mb-1"><strong>Year:</strong> {{ result.year|default:'Unknown' }}</p>
+                <p class="mb-1"><strong>Confidence:</strong> {{ result.confidence|default:'low' }}</p>
+                <p class="text-muted">{{ result.reasoning }}</p>
+                <details class="mb-3">
+                    <summary class="fw-semibold">Search results</summary>
+                    <div class="mt-2">
+                        {% for group in result.search_results %}
+                            <p class="mb-1"><strong>Query:</strong> {{ group.query }}</p>
+                            <ul>
+                                {% for item in group.results %}
+                                    <li>
+                                        <strong>{{ item.title|default:'(no title)' }}</strong><br>
+                                        <small>{{ item.snippet|default:'(no snippet)' }}</small><br>
+                                        <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.url|default:'No URL' }}</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endfor %}
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        {% elif task.summary_json and task.status != 'COMPLETED' %}
+            <p class="text-muted">Waiting for a result...</p>
+        {% elif task.status == 'PENDING' %}
+            <p class="text-muted">The task has been queued and will begin shortly.</p>
+        {% else %}
+            <p class="text-muted">No lookup has started yet.</p>
+        {% endif %}
+    </div>
+</div>

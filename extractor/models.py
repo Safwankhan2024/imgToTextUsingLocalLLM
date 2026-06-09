@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 import hashlib
+import uuid
 
 class Book(models.Model):
     title = models.CharField(max_length=255)
@@ -68,3 +69,23 @@ class PageImage(models.Model):
 
     def __str__(self):
         return f"Page {self.sequence} - {self.chapter.title}"
+
+
+class TitleLookupTask(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('ERROR', 'Error'),
+    )
+
+    task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    summary_json = models.JSONField(blank=True, null=True)
+    error_message = models.TextField(blank=True, null=True)
+    started_at = models.DateTimeField(blank=True, null=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Title lookup {self.task_id} ({self.status})"

@@ -4,6 +4,7 @@ from huey.contrib.djhuey import db_task
 from django.conf import settings
 from .models import Chapter, PageImage
 from .llm import extract_text_from_image
+from .title_lookup import run_batch_lookup
 
 @db_task()
 def process_chapter_images(chapter_id):
@@ -49,3 +50,8 @@ def process_chapter_images(chapter_id):
                 
     except Chapter.DoesNotExist:
         pass
+
+
+@db_task()
+def run_title_lookup(task_id):
+    run_batch_lookup(task_id)

@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
-from .models import Book, Chapter, PageImage
+from .models import Book, Chapter, PageImage, TitleLookupTask
+from .tasks import process_chapter_images, run_title_lookup
 
 def dashboard(request):
     if request.method == 'POST':
@@ -91,6 +92,25 @@ def page_list_status(request, chapter_id):
     return render(request, 'extractor/partials/page_list.html', {
         'pages': pages, 'chapter': chapter, 'has_processing': has_processing
     })
+
+
+def title_year_lookup(request):
+    task = None
+    if request.method == 'POST':
+        task = TitleLookupTask.objects.create(status='PENDING')
+        run_title_lookup(task.task_id)
+
+    return render(request, 'extractor/title_lookup.html', {
+        'task': task
+    })
+
+
+def title_lookup_status(request, task_id):
+    task = get_object_or_404(TitleLookupTask, task_id=task_id)
+    return render(request, 'extractor/partials/title_lookup_partial.html', {
+        'task': task
+    })
+
 
 def review_extracted(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
