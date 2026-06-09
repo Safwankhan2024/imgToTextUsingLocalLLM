@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
-from duckduckgo_search.duckduckgo_search import DDGS
+from ddgs import DDGS
 from .llm import generate_search_queries, extract_year_from_results
 from .models import TitleLookupTask
 
