@@ -64,7 +64,6 @@ def extract_text_from_image(base64_image_uri: str) -> str:
             }
         ],
         "max_tokens": max_tokens,
-        "temperature": 0.1,
         "chat_template_kwargs": {"enable_thinking": enable_thinking}
     }
 
@@ -95,10 +94,11 @@ def extract_text_from_image(base64_image_uri: str) -> str:
     ) from last_error
 
 
-def chat_completion(messages, max_tokens=None, temperature=0.1):
+def chat_completion(messages, max_tokens=None):
     api_base = os.getenv("VL_API_BASE", "http://127.0.0.1:8080/v1")
     model_name = os.getenv("VL_MODEL", "llava")
     timeout_val = int(os.getenv("LLM_TIMEOUT", 120))
+    max_tokens_val = max_tokens if max_tokens is not None else int(os.getenv("LLM_MAX_TOKENS", 8192))
     retry_count = max(int(os.getenv("LLM_RETRIES", 1)), 0)
     enable_thinking = os.getenv("LLM_ENABLE_THINKING", "false").lower() == "true"
 
@@ -110,11 +110,9 @@ def chat_completion(messages, max_tokens=None, temperature=0.1):
     payload = {
         "model": model_name,
         "messages": messages,
-        "temperature": temperature,
+        "max_tokens": max_tokens_val,
         "chat_template_kwargs": {"enable_thinking": enable_thinking}
     }
-    if max_tokens is not None:
-        payload["max_tokens"] = max_tokens
 
     last_error = None
     for _ in range(retry_count + 1):
@@ -138,14 +136,67 @@ def chat_completion(messages, max_tokens=None, temperature=0.1):
     ) from last_error
 
 
+def _strip_thinking_blocks(text: str) -> str:
+    """Remove <think>...</think> blocks that Qwen-style models emit during reasoning."""
+    # Remove well-formed think blocks
+    result = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    # Also handle unclosed <think> tag (model started thinking but tag never closed)
+    result = re.sub(r"<think>.*", "", result, flags=re.DOTALL)
+    return result.strip()
+
+
+def _extract_json_from_markdown(text: str):
+    """Try to extract JSON from a markdown ```json ... ``` code fence."""
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
 def _parse_json_output(raw_text):
     if not isinstance(raw_text, str):
         return None
-    start = raw_text.find("{")
-    end = raw_text.rfind("}")
+
+    # 1. Strip thinking blocks first (Qwen models emit these when enable_thinking=true)
+    cleaned = _strip_thinking_blocks(raw_text)
+
+    # 2. Try markdown code-fence extraction
+    result = _extract_json_from_markdown(cleaned)
+    if result is not None:
+        return result
+
+    # 3. Try last JSON object (from last { to last }) — the actual answer is
+    #    usually the LAST JSON blob, while thinking blocks may contain earlier ones.
+    last_brace = cleaned.rfind("}")
+    if last_brace != -1:
+        # Find the matching opening brace by walking backwards
+        depth = 0
+        start = -1
+        for i in range(last_brace, -1, -1):
+            ch = cleaned[i]
+            if ch == "}":
+                depth += 1
+            elif ch == "{":
+                depth -= 1
+            if depth == 0:
+                start = i
+                break
+        if start != -1:
+            json_text = cleaned[start:last_brace + 1]
+            try:
+                return json.loads(json_text)
+            except json.JSONDecodeError:
+                pass
+
+    # 4. Fallback: first { to last } (original behavior, less robust)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
     if start == -1 or end == -1 or end <= start:
         return None
-    json_text = raw_text[start:end+1]
+    json_text = cleaned[start:end + 1]
     try:
         return json.loads(json_text)
     except json.JSONDecodeError:
@@ -162,7 +213,7 @@ def generate_search_queries(title):
         {"role": "system", "content": "You are a concise search query generation assistant."},
         {"role": "user", "content": prompt}
     ]
-    response = chat_completion(messages, max_tokens=200)
+    response = chat_completion(messages)
     lines = [
         line.strip().lstrip('-*0123456789. ').strip()
         for line in response.splitlines()
@@ -185,7 +236,7 @@ def extract_year_from_results(title, snippets):
         {"role": "system", "content": "You are a structured extraction assistant."},
         {"role": "user", "content": prompt}
     ]
-    response = chat_completion(messages, max_tokens=256)
+    response = chat_completion(messages)
     parsed = _parse_json_output(response)
     if parsed and isinstance(parsed, dict):
         year = parsed.get("year")
