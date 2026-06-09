@@ -13,10 +13,15 @@ You can organize content by book/chapter, upload multiple images, reorder them w
 - Background extraction using `django-huey` + SQLite Huey queue.
 - Per-page extraction status (`PENDING`, `PROCESSING`, `COMPLETED`, `ERROR`).
 - Fallback text backups written to `<Book>_<Chapter>_fallback.txt` in the project root.
+- Publication year lookup from evidence files via `review/*.evidence.txt`.
+  - Scans `TITLE:` markers in evidence files.
+  - Uses DuckDuckGo search and local text LLM prompts to infer publication years.
+  - Stores results in a DB-backed `TitleLookupTask` and writes a JSON artifact under `review/`.
 
 ## Requirements
 - Python 3.10+
 - A local VL model server that exposes an OpenAI-compatible `chat/completions` endpoint.
+- `duckduckgo_search` for publication year lookup.
 
 ## Setup
 
@@ -29,6 +34,7 @@ You can organize content by book/chapter, upload multiple images, reorder them w
 
 2. Install dependencies.
    ```bash
+   pip install -r requirements.txt
    pip install django django-huey python-dotenv requests pillow
    ```
 
@@ -73,8 +79,9 @@ Open `http://127.0.0.1:8000`.
 4. Reorder pages by dragging cards.
 5. Click `Start VL Extraction`.
 6. Open `Review Text` to view stitched extracted content.
-7. Check project root for generated `_fallback.txt` files.
+7. Use the `Lookup Years` navigation button to scan `review/*.evidence.txt` and infer publication years for extracted titles.
+8. Check project root for generated `_fallback.txt` files.
 
 ## Notes
-- This repository currently does not include a `requirements.txt`; dependencies are installed manually as shown above.
+- A `requirements.txt` file is included and contains the `duckduckgo_search` dependency required by the title lookup feature.
 - Static files are already present under `staticfiles/` in this repo snapshot.
