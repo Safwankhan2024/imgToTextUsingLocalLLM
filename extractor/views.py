@@ -103,11 +103,59 @@ def _ensure_system_templates():
 
 
 def title_year_lookup(request):
-    """GET  → show template selector + start button (NO auto-start)
-       POST → create task with selected template, then start it"""
+    """GET  → show template selector + raw edit + start button (NO auto-start)
+       POST → create task with selected or raw template, then start it"""
     _ensure_system_templates()
 
     if request.method == 'POST':
+        mode = request.POST.get('mode', 'template')
+
+        if mode == 'raw':
+            # Build an ad-hoc template from the raw form fields
+            try:
+                extract_fields = json.loads(request.POST.get('extract_fields', '["year"]'))
+            except json.JSONDecodeError:
+                extract_fields = [f.strip() for f in request.POST.get('extract_fields', 'year').split(',') if f.strip()]
+
+            try:
+                output_schema = json.loads(request.POST.get('output_schema', '{}'))
+            except json.JSONDecodeError:
+                output_schema = {}
+
+            search_query_template = request.POST.get('search_query_template', '"{title}" "{isbn}"').strip()
+            prompt_template = request.POST.get('prompt_template', '').strip()
+
+            # Use a transient in-memory template-like object
+            template = type('AdHocTemplate', (), {
+                'id': None,
+                'name': 'Ad-Hoc',
+                'extract_fields': extract_fields,
+                'search_query_template': search_query_template,
+                'prompt_template': prompt_template or LookupTemplate._meta.get_field('prompt_template').default,
+                'output_schema': output_schema,
+            })()
+
+            task = TitleLookupTask.objects.create(
+                status='PENDING',
+                template_config={
+                    'template_id': None,
+                    'template_name': 'Ad-Hoc',
+                    'ad_hoc': {
+                        'extract_fields': extract_fields,
+                        'search_query_template': search_query_template,
+                        'prompt_template': template.prompt_template,
+                        'output_schema': output_schema,
+                    },
+                }
+            )
+            run_title_lookup(task.task_id)
+
+            return render(request, 'extractor/title_lookup.html', {
+                'task': task,
+                'templates': LookupTemplate.objects.filter(is_active=True),
+            })
+
+        # Normal template selection
         template_id = request.POST.get('template_id')
         template = get_object_or_404(LookupTemplate, id=template_id, is_active=True)
 

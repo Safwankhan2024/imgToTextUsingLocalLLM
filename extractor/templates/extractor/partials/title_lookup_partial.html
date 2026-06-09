@@ -68,52 +68,27 @@
                 <strong>Found {{ task.summary_json.books|length }} book(s)</strong>
             </div>
             {% for result in task.summary_json.books %}
-            <div class="card mb-3 border">
-                <div class="card-body py-2">
-                    <h6 class="mb-2">{{ result.title }}</h6>
-                    {% if result.isbn %}
-                    <small class="text-muted d-block mb-1">ISBN: {{ result.isbn }}</small>
-                    {% endif %}
-
-                    {# Render all extracted fields dynamically #}
-                    <div class="row g-2 small">
-                        {% for key, value in result.items %}
-                            {% if key not in 'book_id,title,isbn,queries,search_results' %}
-                            <div class="col-auto">
-                                <span class="text-muted">{{ key }}:</span>
-                                <strong>
-                                    {% if value is None %}
-                                        <span class="text-warning">unknown</span>
-                                    {% elif value is True %}
-                                        ✅ yes
-                                    {% elif value is False %}
-                                        ❌ no
-                                    {% else %}
-                                        {{ value }}
-                                    {% endif %}
-                                </strong>
-                            </div>
+            <div class="card mb-2 border">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ result.title }}</strong>
+                            {% if result.isbn %}
+                            <small class="text-muted ms-2">ISBN: {{ result.isbn }}</small>
                             {% endif %}
-                        {% endfor %}
-                    </div>
-
-                    <details class="mt-2">
-                        <summary class="small fw-semibold text-muted">Search results</summary>
-                        <div class="mt-1 small">
-                            {% for group in result.search_results %}
-                                <p class="mb-1"><strong>Query:</strong> {{ group.query }}</p>
-                                <ul class="mb-2">
-                                    {% for item in group.results %}
-                                        <li>
-                                            <strong>{{ item.title|default:'(no title)' }}</strong><br>
-                                            <span class="text-muted">{{ item.snippet|default:'(no snippet)' }}</span><br>
-                                            <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.url|default:'No URL' }}</a>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% endfor %}
                         </div>
-                    </details>
+                        <div class="text-end">
+                            {% if result.year %}
+                            <span class="badge bg-success fs-6">{{ result.year }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">unknown</span>
+                            {% endif %}
+                            <small class="text-muted d-block">{{ result.confidence|default:'low' }}</small>
+                        </div>
+                    </div>
+                    {% if result.reasoning and result.confidence != 'high' %}
+                    <small class="text-muted d-block mt-1">{{ result.reasoning }}</small>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}

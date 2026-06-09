@@ -4,7 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 from ddgs import DDGS
-from .llm import build_search_queries, extract_from_results
+from .llm import _expand_query_template, extract_from_results
 from .models import TitleLookupTask, LookupTemplate
 
 
@@ -51,54 +51,27 @@ def _run_duckduckgo_search(query, max_results=5):
 
 
 def lookup_book_info(book: dict, template) -> dict:
-    """Look up bibliographic info for a single book using the given template."""
+    """Look up bibliographic info for a single book using the given template.
+
+    Builds ONE search query from the template (title + ISBN together), runs ONE
+    DuckDuckGo search, feeds snippets to the LLM, and returns only the fields
+    the user cares about — no raw search results stored."""
     title = book['title']
     isbn = book.get('isbn', '')
-    query_template = template.search_query_template
+    query = _expand_query_template(title, isbn, template.search_query_template)
 
-    queries = build_search_queries(title, isbn, query_template)
-    if not queries:
-        queries = [query_template.format(title=title, isbn=isbn)]
-
-    search_results = []
-    for i, query in enumerate(queries):
-        if i > 0:
-            time.sleep(2)  # be polite to DuckDuckGo
-        try:
-            results = _run_duckduckgo_search(query, max_results=5)
-        except Exception as exc:
-            search_results.append({
-                'query': query,
-                'error': str(exc),
-                'results': []
-            })
-            continue
-
-        formatted_results = []
-        for entry in results:
-            item_title = entry.get('title') or ''
-            snippet = entry.get('body') or entry.get('snippet') or entry.get('title') or ''
-            url = entry.get('href') or entry.get('url') or ''
-            formatted_results.append({
-                'title': item_title,
-                'snippet': snippet,
-                'url': url,
-            })
-
-        search_results.append({
-            'query': query,
-            'results': formatted_results,
-        })
+    # Run the single search
+    try:
+        results = _run_duckduckgo_search(query, max_results=5)
+    except Exception as exc:
+        results = []
 
     snippet_lines = []
-    for group in search_results:
-        if 'error' in group:
-            snippet_lines.append(f"Query: {group['query']} - Error: {group['error']}")
-            continue
-        for result in group['results']:
-            snippet_lines.append(
-                f"{result['title']} - {result['snippet']} ({result['url']})"
-            )
+    for entry in results:
+        item_title = entry.get('title') or ''
+        snippet = entry.get('body') or entry.get('snippet') or entry.get('title') or ''
+        url = entry.get('href') or entry.get('url') or ''
+        snippet_lines.append(f"{item_title} - {snippet} ({url})")
 
     snippets = '\n'.join(snippet_lines[:20])
     extracted = extract_from_results(title, isbn, snippets, template)
@@ -107,8 +80,6 @@ def lookup_book_info(book: dict, template) -> dict:
         'book_id': book.get('book_id', ''),
         'title': title,
         'isbn': isbn,
-        'queries': queries,
-        'search_results': search_results,
         **extracted,
     }
 
@@ -119,7 +90,19 @@ def run_batch_lookup(task_id):
     # Load template
     template_config = task.template_config or {}
     template_id = template_config.get('template_id')
-    if template_id:
+    ad_hoc = template_config.get('ad_hoc')
+
+    if ad_hoc:
+        # Ad-hoc template from "raw" mode
+        template = type('AdHocTemplate', (), {
+            'id': None,
+            'name': 'Ad-Hoc',
+            'extract_fields': ad_hoc.get('extract_fields', []),
+            'search_query_template': ad_hoc.get('search_query_template', '"{title}" "{isbn}"'),
+            'prompt_template': ad_hoc.get('prompt_template', ''),
+            'output_schema': ad_hoc.get('output_schema', {}),
+        })()
+    elif template_id:
         try:
             template = LookupTemplate.objects.get(id=template_id, is_active=True)
         except LookupTemplate.DoesNotExist:

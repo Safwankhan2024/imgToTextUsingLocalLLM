@@ -265,35 +265,16 @@ def _parse_json_output(raw_text):
     return None
 
 
-def build_search_queries(title: str, isbn: str, query_template: str) -> list[str]:
-    """Given a title, ISBN and a query template, ask the LLM to produce 2-3
-    concrete search queries, then also include the literal template expansion
-    as a fallback."""
-    prompt = (
-        "Generate 2 to 3 concise DuckDuckGo search queries to find bibliographic "
-        f"information for this specific book edition:\n\n"
-        f"Title: {title}\n"
-        f"ISBN: {isbn}\n\n"
-        "Output one query per line only."
-    )
-    messages = [
-        {"role": "system", "content": "You are a concise search query generation assistant."},
-        {"role": "user", "content": prompt}
-    ]
-    response = chat_completion(messages)
-    lines = [
-        re.sub(r'^[\d.\-*\s]+', '', line.strip())
-        for line in response.splitlines()
-        if line.strip()
-    ]
-    queries = [line for line in lines if line][:3]
-
-    # Always include the literal template expansion as the first query
-    literal = query_template.format(title=title, isbn=isbn)
-    if literal not in queries:
-        queries.insert(0, literal)
-
-    return queries[:4]
+def _expand_query_template(title: str, isbn: str, query_template: str) -> str:
+    """Build a single search query from the template, handling empty ISBN cleanly."""
+    if isbn:
+        return query_template.format(title=title, isbn=isbn)
+    # No ISBN — strip the isbn placeholder so we don't send empty quotes
+    import re as _re
+    query = query_template.replace('{isbn}', '')
+    query = _re.sub(r'""\s*', '', query)
+    query = _re.sub(r'\s+', ' ', query)
+    return query.format(title=title).strip()
 
 
 def extract_from_results(title: str, isbn: str, snippets: str, template) -> dict:
