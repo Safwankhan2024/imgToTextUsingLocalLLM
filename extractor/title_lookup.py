@@ -101,14 +101,28 @@ def run_batch_lookup(task_id):
         return
     
     task.status = 'PROCESSING'
-    task.started_at = timezone.now()
+    if not task.started_at:
+        task.started_at = timezone.now()
     task.save()
 
+    artifact_path = Path(settings.BASE_DIR) / 'review' / f'title_lookup_{task_id}.json'
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Load existing summary if resuming
     summary = {
         'task_id': str(task_id),
         'started_at': task.started_at.isoformat(),
         'titles': [],
     }
+    
+    processed_titles = set()
+    if artifact_path.exists():
+        try:
+            existing_data = json.loads(artifact_path.read_text(encoding='utf-8'))
+            summary['titles'] = existing_data.get('titles', [])
+            processed_titles = {item['title'] for item in summary['titles']}
+        except (json.JSONDecodeError, OSError):
+            pass
 
     try:
         titles = scan_evidence_files()
@@ -128,13 +142,19 @@ def run_batch_lookup(task_id):
             task.current_title_index = index
             task.save(update_fields=['current_title_index'])
             
-            summary['titles'].append(lookup_year_for_title(title))
+            # Skip if already processed
+            if title not in processed_titles:
+                result = lookup_year_for_title(title)
+                summary['titles'].append(result)
+                processed_titles.add(title)
+            
+            # Write JSON after each title for persistence
+            artifact_path.write_text(json.dumps(summary, indent=2), encoding='utf-8')
 
         summary['total_titles'] = len(summary['titles'])
         summary['completed_at'] = timezone.now().isoformat()
 
-        artifact_path = Path(settings.BASE_DIR) / 'review' / f'title_lookup_{task_id}.json'
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        # Final write with completion timestamp
         artifact_path.write_text(json.dumps(summary, indent=2), encoding='utf-8')
 
         task.summary_json = summary
