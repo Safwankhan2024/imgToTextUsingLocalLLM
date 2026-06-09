@@ -14,10 +14,24 @@
                 <span class="badge bg-warning text-dark">Processing</span>
             {% elif task.status == 'COMPLETED' %}
                 <span class="badge bg-success">Completed</span>
+            {% elif task.status == 'CANCELLED' %}
+                <span class="badge bg-info">Cancelled</span>
             {% else %}
                 <span class="badge bg-danger">Error</span>
             {% endif %}
         </p>
+
+        {% if task.status == 'PROCESSING' and task.total_titles > 0 %}
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Progress:</strong>
+                <span class="text-muted">{{ task.current_title_index }}/{{ task.total_titles }} titles</span>
+            </div>
+            <div class="progress" role="progressbar" aria-valuenow="{{ task.current_title_index }}" aria-valuemin="0" aria-valuemax="{{ task.total_titles }}">
+                <div class="progress-bar" style="width: {% widthratio task.current_title_index task.total_titles 100 %}%"></div>
+            </div>
+        </div>
+        {% endif %}
 
         {% if task.error_message %}
         <div class="alert alert-danger">
@@ -29,6 +43,17 @@
             Task started at: {{ task.started_at|default:'Not started' }}<br>
             Completed at: {{ task.completed_at|default:'N/A' }}
         </p>
+
+        {% if task.status in 'PROCESSING,PENDING' %}
+        <div class="mb-3">
+            <form method="post" action="{% url 'cancel_title_lookup' task.task_id %}" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" hx-post="{% url 'cancel_title_lookup' task.task_id %}" hx-swap="outerHTML">
+                    Cancel Lookup
+                </button>
+            </form>
+        </div>
+        {% endif %}
 
         {% if task.summary_json and task.status == 'COMPLETED' %}
             <div class="mb-3">
@@ -59,6 +84,10 @@
                 </details>
             </div>
             {% endfor %}
+        {% elif task.status == 'CANCELLED' %}
+            <div class="alert alert-info">
+                <strong>Lookup cancelled.</strong> Processed {{ task.current_title_index }} of {{ task.total_titles }} titles.
+            </div>
         {% elif task.summary_json and task.status != 'COMPLETED' %}
             <p class="text-muted">Waiting for a result...</p>
         {% elif task.status == 'PENDING' %}

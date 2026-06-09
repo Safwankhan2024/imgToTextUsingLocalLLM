@@ -77,15 +77,22 @@ class TitleLookupTask(models.Model):
         ('PROCESSING', 'Processing'),
         ('COMPLETED', 'Completed'),
         ('ERROR', 'Error'),
+        ('CANCELLED', 'Cancelled'),
     )
 
     task_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    current_title_index = models.IntegerField(default=0)
+    total_titles = models.IntegerField(default=0)
     summary_json = models.JSONField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)
+    cancelled_at = models.DateTimeField(blank=True, null=True)
     started_at = models.DateTimeField(blank=True, null=True)
     completed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"Title lookup {self.task_id} ({self.status})"
+    
+    def is_cancelled(self):
+        return self.status == 'CANCELLED' or self.cancelled_at is not None

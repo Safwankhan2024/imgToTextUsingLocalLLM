@@ -112,6 +112,21 @@ def title_lookup_status(request, task_id):
     })
 
 
+def cancel_title_lookup(request, task_id):
+    from django.utils import timezone
+    if request.method == 'POST':
+        task = get_object_or_404(TitleLookupTask, task_id=task_id)
+        if task.status in ['PENDING', 'PROCESSING']:
+            task.status = 'CANCELLED'
+            task.cancelled_at = timezone.now()
+            task.save()
+    
+    task = get_object_or_404(TitleLookupTask, task_id=task_id)
+    return render(request, 'extractor/partials/title_lookup_partial.html', {
+        'task': task
+    })
+
+
 def review_extracted(request, chapter_id):
     chapter = get_object_or_404(Chapter, id=chapter_id)
     pages = chapter.pages.order_by('sequence', 'id')

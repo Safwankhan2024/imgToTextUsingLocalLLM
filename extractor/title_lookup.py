@@ -92,6 +92,14 @@ def lookup_year_for_title(title):
 
 def run_batch_lookup(task_id):
     task = TitleLookupTask.objects.get(task_id=task_id)
+    
+    # Check if already cancelled before starting
+    if task.is_cancelled():
+        task.status = 'CANCELLED'
+        task.completed_at = timezone.now()
+        task.save()
+        return
+    
     task.status = 'PROCESSING'
     task.started_at = timezone.now()
     task.save()
@@ -104,7 +112,22 @@ def run_batch_lookup(task_id):
 
     try:
         titles = scan_evidence_files()
-        for title in titles:
+        task.total_titles = len(titles)
+        task.save()
+        
+        for index, title in enumerate(titles, start=1):
+            # Check if task was cancelled
+            task.refresh_from_db()
+            if task.is_cancelled():
+                task.status = 'CANCELLED'
+                task.completed_at = timezone.now()
+                task.save()
+                return
+            
+            # Update progress
+            task.current_title_index = index
+            task.save(update_fields=['current_title_index'])
+            
             summary['titles'].append(lookup_year_for_title(title))
 
         summary['total_titles'] = len(summary['titles'])
