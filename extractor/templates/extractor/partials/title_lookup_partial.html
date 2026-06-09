@@ -5,27 +5,35 @@
     hx-swap="outerHTML"
     {% endif %}>
     <div class="card-body">
-        <h2 class="card-title">Lookup Status</h2>
-        <p class="mb-2">
-            <strong>Status:</strong>
-            {% if task.status == 'PENDING' %}
-                <span class="badge bg-secondary">Pending</span>
-            {% elif task.status == 'PROCESSING' %}
-                <span class="badge bg-warning text-dark">Processing</span>
-            {% elif task.status == 'COMPLETED' %}
-                <span class="badge bg-success">Completed</span>
-            {% elif task.status == 'CANCELLED' %}
-                <span class="badge bg-info">Cancelled</span>
-            {% else %}
-                <span class="badge bg-danger">Error</span>
-            {% endif %}
-        </p>
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="card-title mb-1">Lookup Status</h2>
+                {% if task.template_config.template_name %}
+                <span class="badge bg-light text-dark border">
+                    Template: {{ task.template_config.template_name }}
+                </span>
+                {% endif %}
+            </div>
+            <span>
+                {% if task.status == 'PENDING' %}
+                    <span class="badge bg-secondary fs-6">Pending</span>
+                {% elif task.status == 'PROCESSING' %}
+                    <span class="badge bg-warning text-dark fs-6">Processing</span>
+                {% elif task.status == 'COMPLETED' %}
+                    <span class="badge bg-success fs-6">Completed</span>
+                {% elif task.status == 'CANCELLED' %}
+                    <span class="badge bg-info fs-6">Cancelled</span>
+                {% else %}
+                    <span class="badge bg-danger fs-6">Error</span>
+                {% endif %}
+            </span>
+        </div>
 
         {% if task.status == 'PROCESSING' and task.total_titles > 0 %}
         <div class="mb-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <strong>Progress:</strong>
-                <span class="text-muted">{{ task.current_title_index }}/{{ task.total_titles }} titles</span>
+                <span class="text-muted">{{ task.current_title_index }}/{{ task.total_titles }} books</span>
             </div>
             <div class="progress" role="progressbar" aria-valuenow="{{ task.current_title_index }}" aria-valuemin="0" aria-valuemax="{{ task.total_titles }}">
                 <div class="progress-bar" style="width: {% widthratio task.current_title_index task.total_titles 100 %}%"></div>
@@ -55,45 +63,76 @@
         </div>
         {% endif %}
 
-        {% if task.summary_json and task.status == 'COMPLETED' %}
+        {% if task.summary_json and task.status == 'COMPLETED' and task.summary_json.books %}
             <div class="mb-3">
-                <strong>Found {{ task.summary_json.titles|length }} title(s)</strong>
+                <strong>Found {{ task.summary_json.books|length }} book(s)</strong>
             </div>
-            {% for result in task.summary_json.titles %}
-            <div class="mb-4">
-                <h5>{{ result.title }}</h5>
-                <p class="mb-1"><strong>Year:</strong> {{ result.year|default:'Unknown' }}</p>
-                <p class="mb-1"><strong>Confidence:</strong> {{ result.confidence|default:'low' }}</p>
-                <p class="text-muted">{{ result.reasoning }}</p>
-                <details class="mb-3">
-                    <summary class="fw-semibold">Search results</summary>
-                    <div class="mt-2">
-                        {% for group in result.search_results %}
-                            <p class="mb-1"><strong>Query:</strong> {{ group.query }}</p>
-                            <ul>
-                                {% for item in group.results %}
-                                    <li>
-                                        <strong>{{ item.title|default:'(no title)' }}</strong><br>
-                                        <small>{{ item.snippet|default:'(no snippet)' }}</small><br>
-                                        <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.url|default:'No URL' }}</a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
+            {% for result in task.summary_json.books %}
+            <div class="card mb-3 border">
+                <div class="card-body py-2">
+                    <h6 class="mb-2">{{ result.title }}</h6>
+                    {% if result.isbn %}
+                    <small class="text-muted d-block mb-1">ISBN: {{ result.isbn }}</small>
+                    {% endif %}
+
+                    {# Render all extracted fields dynamically #}
+                    <div class="row g-2 small">
+                        {% for key, value in result.items %}
+                            {% if key not in 'book_id,title,isbn,queries,search_results' %}
+                            <div class="col-auto">
+                                <span class="text-muted">{{ key }}:</span>
+                                <strong>
+                                    {% if value is None %}
+                                        <span class="text-warning">unknown</span>
+                                    {% elif value is True %}
+                                        ✅ yes
+                                    {% elif value is False %}
+                                        ❌ no
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </strong>
+                            </div>
+                            {% endif %}
                         {% endfor %}
                     </div>
-                </details>
+
+                    <details class="mt-2">
+                        <summary class="small fw-semibold text-muted">Search results</summary>
+                        <div class="mt-1 small">
+                            {% for group in result.search_results %}
+                                <p class="mb-1"><strong>Query:</strong> {{ group.query }}</p>
+                                <ul class="mb-2">
+                                    {% for item in group.results %}
+                                        <li>
+                                            <strong>{{ item.title|default:'(no title)' }}</strong><br>
+                                            <span class="text-muted">{{ item.snippet|default:'(no snippet)' }}</span><br>
+                                            <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.url|default:'No URL' }}</a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endfor %}
+                        </div>
+                    </details>
+                </div>
             </div>
             {% endfor %}
         {% elif task.status == 'CANCELLED' %}
             <div class="alert alert-info">
-                <strong>Lookup cancelled.</strong> Processed {{ task.current_title_index }} of {{ task.total_titles }} titles.
+                <strong>Lookup cancelled.</strong> Processed {{ task.current_title_index }} of {{ task.total_titles }} books.
             </div>
         {% elif task.summary_json and task.status != 'COMPLETED' %}
-            <p class="text-muted">Waiting for a result...</p>
+            <p class="text-muted">Waiting for results...</p>
         {% elif task.status == 'PENDING' %}
             <p class="text-muted">The task has been queued and will begin shortly.</p>
         {% else %}
             <p class="text-muted">No lookup has started yet.</p>
+        {% endif %}
+
+        {% if task.status == 'COMPLETED' %}
+        <a href="{% url 'title_year_lookup' %}" class="btn btn-outline-primary btn-sm">
+            ← New Lookup
+        </a>
         {% endif %}
     </div>
 </div>

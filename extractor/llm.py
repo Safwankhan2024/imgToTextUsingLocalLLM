@@ -265,10 +265,15 @@ def _parse_json_output(raw_text):
     return None
 
 
-def generate_search_queries(title):
+def build_search_queries(title: str, isbn: str, query_template: str) -> list[str]:
+    """Given a title, ISBN and a query template, ask the LLM to produce 2-3
+    concrete search queries, then also include the literal template expansion
+    as a fallback."""
     prompt = (
-        "Generate 2 to 3 concise DuckDuckGo search queries to find the publication year "
-        f"for the following book title:\n\n{title}\n\n"
+        "Generate 2 to 3 concise DuckDuckGo search queries to find bibliographic "
+        f"information for this specific book edition:\n\n"
+        f"Title: {title}\n"
+        f"ISBN: {isbn}\n\n"
         "Output one query per line only."
     )
     messages = [
@@ -281,40 +286,61 @@ def generate_search_queries(title):
         for line in response.splitlines()
         if line.strip()
     ]
-    return [line for line in lines if line][:3]
+    queries = [line for line in lines if line][:3]
+
+    # Always include the literal template expansion as the first query
+    literal = query_template.format(title=title, isbn=isbn)
+    if literal not in queries:
+        queries.insert(0, literal)
+
+    return queries[:4]
 
 
-def extract_year_from_results(title, snippets):
-    prompt = (
-        "You are given a book title and search result snippets. Identify the most likely publication year "
-        "for that work. If you cannot determine a year, return null for year. Always output valid JSON exactly in the format:\n"
-        "{\"year\": <number|null>, \"confidence\": \"low|medium|high\", \"reasoning\": \"...\"}\n\n"
-        f"Title: {title}\n\n"
-        "Search snippets:\n"
-        f"{snippets}\n\n"
-        "Be concise and honest about your confidence."
+def extract_from_results(title: str, isbn: str, snippets: str, template) -> dict:
+    """Use a LookupTemplate to extract structured info from search snippets.
+
+    Returns a dict whose keys are controlled by the template's output_schema
+    plus the standard fields: title, isbn, queries, search_results,
+    confidence, reasoning."""
+    fields_list = template.extract_fields or []
+    fields_text = '\n'.join(f'- {f}' for f in fields_list)
+
+    try:
+        schema_text = json.dumps(template.output_schema, indent=2)
+    except (TypeError, ValueError):
+        schema_text = '{"year": <number|null>, "confidence": "low|medium|high", "reasoning": "..."}'
+
+    prompt = template.prompt_template.format(
+        title=title,
+        isbn=isbn,
+        fields=fields_text,
+        schema=schema_text,
+        snippets=snippets,
     )
+
     messages = [
-        {"role": "system", "content": "You are a structured extraction assistant."},
+        {"role": "system", "content": "You are a structured bibliographic extraction assistant."},
         {"role": "user", "content": prompt}
     ]
     response = chat_completion(messages)
     parsed = _parse_json_output(response)
+
     if parsed and isinstance(parsed, dict):
-        year = parsed.get("year")
         confidence = parsed.get("confidence") or "low"
         reasoning = parsed.get("reasoning") or "Could not parse model output."
-        if year is not None:
-            try:
-                year = int(year)
-            except (ValueError, TypeError):
-                year = None
-        return {
-            "year": year,
-            "confidence": confidence,
-            "reasoning": reasoning.strip()
-        }
 
+        # Try to coerce 'year' to int if present
+        if 'year' in parsed and parsed['year'] is not None:
+            try:
+                parsed['year'] = int(parsed['year'])
+            except (ValueError, TypeError):
+                parsed['year'] = None
+
+        parsed['confidence'] = confidence
+        parsed['reasoning'] = reasoning.strip()
+        return parsed
+
+    # Fallback: try to extract at least a year from the raw response
     year_match = re.search(r"(19\d{2}|20\d{2})", response)
     year = int(year_match.group(1)) if year_match else None
     confidence = "medium" if year else "low"
@@ -325,5 +351,5 @@ def extract_year_from_results(title, snippets):
     return {
         "year": year,
         "confidence": confidence,
-        "reasoning": reasoning
+        "reasoning": reasoning,
     }

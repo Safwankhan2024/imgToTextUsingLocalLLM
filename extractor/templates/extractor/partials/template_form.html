@@ -1,0 +1,75 @@
+{% if editing and editing.id %}
+{# ─── Edit existing template ─── #}
+<form hx-post="{% url 'template_update' editing.id %}"
+      hx-target="#template-list-container"
+      hx-swap="innerHTML">
+    <h6 class="mb-2">Edit "{{ editing.name }}"</h6>
+{% else %}
+{# ─── Create new template ─── #}
+<form hx-post="{% url 'template_create' %}"
+      hx-target="#template-list-container"
+      hx-swap="innerHTML">
+    <h6 class="mb-2">New Custom Template</h6>
+{% endif %}
+    {% csrf_token %}
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">Name</label>
+        <input type="text" name="name" class="form-control form-control-sm"
+               value="{{ editing.name|default:'' }}" required>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">Description</label>
+        <input type="text" name="description" class="form-control form-control-sm"
+               value="{{ editing.description|default:'' }}">
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">
+            Fields to extract
+            <span class="text-muted fw-normal">(JSON array or comma-separated)</span>
+        </label>
+        <input type="text" name="extract_fields" class="form-control form-control-sm"
+               value="{{ editing.extract_fields|default:'[\"year\"]'|safe }}">
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">
+            Search query template
+            <span class="text-muted fw-normal">use {'{title}'} and {'{isbn}'}</span>
+        </label>
+        <input type="text" name="search_query_template" class="form-control form-control-sm"
+               value="{{ editing.search_query_template|default:'\"{title}\" \"{isbn}\" publication year' }}">
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">
+            LLM prompt template
+            <span class="text-muted fw-normal">use {'{title}'}, {'{isbn}'}, {'{fields}'}, {'{schema}'}, {'{snippets}'}</span>
+        </label>
+        <textarea name="prompt_template" class="form-control form-control-sm" rows="4"
+                  >{{ editing.prompt_template|default:'' }}</textarea>
+    </div>
+
+    <div class="mb-2">
+        <label class="form-label small fw-bold">
+            Output JSON schema
+            <span class="text-muted fw-normal">e.g. {'{"year":"&lt;number|null&gt;","confidence":"low|medium|high","reasoning":"..."}'}</span>
+        </label>
+        <textarea name="output_schema" class="form-control form-control-sm" rows="3"
+                  >{{ editing.output_schema|default:'{"year":"<number|null>","confidence":"low|medium|high","reasoning":"..."}' }}</textarea>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary">
+            {% if editing and editing.id %}Save{% else %}Create{% endif %}
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                hx-get="{% url 'title_year_lookup' %}"
+                hx-target="#custom-template-form"
+                hx-swap="innerHTML">
+            Cancel
+        </button>
+    </div>
+</form>

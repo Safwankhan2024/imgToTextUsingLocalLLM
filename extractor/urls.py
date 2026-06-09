@@ -12,4 +12,8 @@ urlpatterns = [
     path('lookup-years/', views.title_year_lookup, name='title_year_lookup'),
     path('lookup-years/<uuid:task_id>/status/', views.title_lookup_status, name='title_lookup_status'),
     path('lookup-years/<uuid:task_id>/cancel/', views.cancel_title_lookup, name='cancel_title_lookup'),
+    path('templates/create/', views.template_create, name='template_create'),
+    path('templates/<int:template_id>/edit/', views.template_edit_form, name='template_edit_form'),
+    path('templates/<int:template_id>/update/', views.template_update, name='template_update'),
+    path('templates/<int:template_id>/delete/', views.template_delete, name='template_delete'),
 ]
